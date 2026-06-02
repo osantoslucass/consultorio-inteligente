@@ -1,0 +1,65 @@
+name: Buscar Notícias Semanais
+
+on:
+  schedule:
+    # Toda segunda-feira às 9h (Brasília = UTC-3 → 12:00 UTC)
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+    inputs:
+      tema:
+        description: "Tema de busca"
+        required: false
+        default: "odontologia dentista"
+      max_noticias:
+        description: "Número máximo de notícias"
+        required: false
+        default: "30"
+
+jobs:
+  buscar-noticias:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: news_tracker/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r news_tracker/requirements.txt
+
+      - name: Buscar notícias
+        env:
+          TEMA_NOTICIAS: ${{ github.event.inputs.tema || 'odontologia dentista' }}
+          ARQUIVO_EXCEL: planilha.xlsx
+        run: |
+          python news_tracker/buscar_noticias.py \
+            --tema "$TEMA_NOTICIAS" \
+            --max ${{ github.event.inputs.max_noticias || 30 }} \
+            --arquivo news_tracker/planilha.xlsx
+
+      - name: Salvar planilha como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: planilha-noticias-${{ github.run_number }}
+          path: news_tracker/planilha.xlsx
+          retention-days: 90
+
+      - name: Commitar planilha atualizada no repositório
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add news_tracker/planilha.xlsx
+          if git diff --cached --quiet; then
+            echo "Nenhuma notícia nova — planilha não alterada."
+          else
+            git commit -m "chore: atualiza planilha de notícias ($(date '+%Y-%m-%d'))"
+            git push
+          fi

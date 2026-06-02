@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
 *.pyo
-planilha.xlsx
+# planilha.xlsx gerenciada pelo GitHub Actions — não ignorar no repo
 noticias.log
 .env
